@@ -2,3 +2,5 @@ Extras
 .DS_Store
 ESPEasy/src/PrivateConfig.h
 Proof
+project.xcworkspace
+xcuserdata
