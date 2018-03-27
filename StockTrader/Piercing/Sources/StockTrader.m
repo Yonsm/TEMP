@@ -1,23 +1,35 @@
 
 //
 #import "HookUtil.h"
-#import "HTTPServer.h"
 #import "StockTrader.h"
+#import "HTTPServer.h"
 
 //
 tztStockBuySellViewNew *_view = nil;
-
-NSData *StockTrade(NSMutableDictionary *dict)
+HOOK_MESSAGE(void, tztStockTradeViewController, viewDidAppear_, BOOL animated)
 {
-	if (!dict[@"StockCode"] || !dict[@"Price"] || !dict[@"Volume"] || !dict[@"WTAccount"] || !dict[@"WTAccountType"])
-		return [@"USAGE: http://xxx.xxx.x.x/?StockCode=xxxxxx&Price=xx.xx&Volume=xxx&WTAccount=AXXXXXXXXX&WTAccountType=SHACCOUNT" dataUsingEncoding:NSUTF8StringEncoding];
+	_tztStockTradeViewController_viewDidAppear_(self, sel, animated);
 
-	if (!dict[@"CommBatchEntrustInfo"])
-		dict[@"CommBatchEntrustInfo"] = @"1";
-	if (!dict[@"Direction"])
-		dict[@"Direction"] = @"B";
-	if (!dict[@"PriceType"])
-		dict[@"PriceType"] = @"0";
+	//
+	UIView *contentView = [[self view] subviews][0];
+	for (UIView *view in contentView.subviews)
+	{
+		if ([NSStringFromClass(view.class) isEqualToString:@"tztStockBuySellViewNew"])
+		{
+			if (_view == nil)
+				[[[HTTPServer alloc] init] start:8888];
+			_view = (id)view;
+			break;
+		}
+	}
+}
+
+//
+NSData *StockTrade(NSString *action, NSMutableDictionary *dict, BOOL showProgress)
+{
+	if (action.length == 0)
+		return [@"USAGE: http://xxx.xxx.x.x/110?Direction=<B|S>&StockCode=<xxxxxx>&Price=<xx.xx>&PriceType=0&Volume=<xxx>&WTAccount=<AXXXXXXXXX>&WTAccountType=SHACCOUNT&CommBatchEntrustInfo=1" dataUsingEncoding:NSUTF8StringEncoding];
+
 	if (!dict[@"Reqno"])
 	{
 		Class tztNewReqno = NSClassFromString(@"tztNewReqno");
@@ -30,78 +42,38 @@ NSData *StockTrade(NSMutableDictionary *dict)
 	}
 
 	Class tztMoblieStockComm = NSClassFromString(@"tztMoblieStockComm");
-	unsigned long long ret = [[tztMoblieStockComm getShareInstance] onSendDataAction:@"110" withDictValue:dict];
+	unsigned long long ret = [[tztMoblieStockComm getShareInstance] onSendDataAction:action withDictValue:dict];
 	dict[@"RETURN"] = @(ret);
 	return [NSJSONSerialization dataWithJSONObject:dict options:NSJSONWritingPrettyPrinted error:nil];
 }
 
 //
-HOOK_MESSAGE(void, tztStockTradeViewController, viewDidAppear_, BOOL animated)
+NSMutableString *_actionLogs = nil;
+_HOOK_MESSAGE(unsigned long long, tztMoblieStockComm, onSendDataAction_withDictValue_bShowProcess_, NSString *action, NSMutableDictionary *dict, BOOL bShowProcess)
 {
-	_tztStockTradeViewController_viewDidAppear_(self, sel, animated);
-	
-	UIView *contentView = [[self view] subviews][0];
-	for (UIView *view in contentView.subviews)
+	if (_actionLogs)
 	{
-		if ([NSStringFromClass(view.class) isEqualToString:@"tztStockBuySellViewNew"])
+		@synchronized (_actionLogs)
 		{
-			static HTTPServer *_httpServer = nil;
-			if (_httpServer == nil)
-			{
-				_httpServer = [[HTTPServer alloc] init];
-				[_httpServer start:80];
-			}
-			_view = (id)view;
-			break;
+			NSString *stamp = NSFormatDateWithStyle(NSDate.date, NSDateFormatterNoStyle, NSDateFormatterMediumStyle);
+			[_actionLogs appendFormat:@"%@ %@-%d=>%@\n", stamp, action, bShowProcess, dict];
 		}
 	}
+	return _tztMoblieStockComm_onSendDataAction_withDictValue_bShowProcess_(self, sel, action, dict, bShowProcess);
 }
 
 //
-#if 0
-
-//
-HOOK_MESSAGE(unsigned long long, tztMoblieStockComm, onSendDataAction_withDictValue_/*bShowProcess_*/, NSString *arg1, id dict/*, BOOL arg3*/)
+NSString * readActionLog(void)
 {
-	NSLog(@"tztMoblieStockComm_onSendDataAction_withDictValue: arg1=%@, arg2=%@"/*, arg3=%d"*/, arg1, dict/*, arg3*/);
-	if ([arg1 isEqualToString:@"110"])
+	if (_actionLogs == nil)
 	{
-		//
-		_LogLine();
-		//return 0;
+		_actionLogs = [NSMutableString string];	// 这里赋值理论上有同步问题，但机率是几乎不会触发，故忽略
+		_Init_tztMoblieStockComm_onSendDataAction_withDictValue_bShowProcess_();
+		return @"Action logging ENABLED...";
 	}
-	unsigned long long ret = _tztMoblieStockComm_onSendDataAction_withDictValue_/*bShowProcess_*/(self, sel, arg1, dict/*, arg3*/);
-	//NSLog(@"tztMoblieStockComm_onSendDataAction_withDictValue: ret=%lld, dict=%@", ret, dict);
-	return ret;
+	
+	@synchronized (_actionLogs)
+	{
+		return _actionLogs;
+	}
 }
-
-//
-HOOK_MESSAGE(void, tztStockBuySellViewNew, OnSendBuySell)
-{
-	_tztStockBuySellViewNew_OnSendBuySell(self, sel);
-	//StockTrade(@"600588", @"30.00", @"100");
-}
-
-HOOK_META(id, tztNewReqno, key_reqno_, long long key, int reqno)
-{
-	id ret = _tztNewReqno_key_reqno_(self, sel, key, reqno);
-	NSLog(@"tztNewReqno_key_reqno_: key=%lld, reqno=%d, ret=%@", key, reqno, ret);
-	return ret;
-}
-
-//
-HOOK_META(id, tztNewReqno, reqnoWithString_, id arg)
-{
-	id ret = _tztNewReqno_reqnoWithString_(self, sel, arg);
-	NSLog(@"tztNewReqno_reqnoWithString_: arg=%@, ret=%@", arg, ret);
-	return ret;
-}
-
-//
-HOOK_MESSAGE(void, tztNewReqno, setPageData_, id arg)
-{
-	NSLog(@"tztNewReqno_setPageData_: arg=%@", arg);
-	_tztNewReqno_setPageData_(self, sel, arg);
-}
-#endif
-
