@@ -26,6 +26,6 @@ __attribute__((constructor)) int main()
 {
 	//_LogLine();
 	//_Init_dlsym();
-	//[[[HTTPServer alloc] init] start:80];
+	[[HTTPServer sharedHTTPServer] start:80];
 	return 0;
 }

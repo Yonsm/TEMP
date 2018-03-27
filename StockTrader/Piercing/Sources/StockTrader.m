@@ -1,6 +1,5 @@
 
 //
-#import "HookUtil.h"
 #import "StockTrader.h"
 #import "HTTPServer.h"
 
@@ -16,8 +15,6 @@ HOOK_MESSAGE(void, tztStockTradeViewController, viewDidAppear_, BOOL animated)
 	{
 		if ([NSStringFromClass(view.class) isEqualToString:@"tztStockBuySellViewNew"])
 		{
-			if (_view == nil)
-				[[[HTTPServer alloc] init] start:8888];
 			_view = (id)view;
 			break;
 		}
@@ -27,9 +24,6 @@ HOOK_MESSAGE(void, tztStockTradeViewController, viewDidAppear_, BOOL animated)
 //
 NSData *StockTrade(NSString *action, NSMutableDictionary *dict, BOOL showProgress)
 {
-	if (action.length == 0)
-		return [@"USAGE: http://xxx.xxx.x.x/110?Direction=<B|S>&StockCode=<xxxxxx>&Price=<xx.xx>&PriceType=0&Volume=<xxx>&WTAccount=<AXXXXXXXXX>&WTAccountType=SHACCOUNT&CommBatchEntrustInfo=1" dataUsingEncoding:NSUTF8StringEncoding];
-
 	if (!dict[@"Reqno"])
 	{
 		Class tztNewReqno = NSClassFromString(@"tztNewReqno");
