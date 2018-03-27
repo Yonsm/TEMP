@@ -28,12 +28,16 @@
 	BOOL showProgress = [path.pathExtension boolValue];
 	NSMutableDictionary *dict = (id)NSUrlQueryToDict(url.query);
 	
-	NSData *data = (!action.length || !dict.count)
-	? [[NSString stringWithFormat:@"USAGE: http://%@/110?Direction=<B|S>&StockCode=<xxxxxx>&Price=<xx.xx>&PriceType=0&Volume=<xxx>&WTAccount=<AXXXXXXXXX>&WTAccountType=SHACCOUNT&CommBatchEntrustInfo=1", url.host] dataUsingEncoding:NSUTF8StringEncoding]
-	: StockTrade(action, dict, showProgress);
+	NSData *data;
+	if ([action isEqualToString:@"log"])
+		data = [ActionLogs() dataUsingEncoding:NSUTF8StringEncoding];
+	else if (!action.length || !dict.count)
+		data = [[NSString stringWithFormat:@"USAGE: http://%@/110?Direction=<B|S>&StockCode=<xxxxxx>&Price=<xx.xx>&PriceType=0&Volume=<xxx>&WTAccount=<AXXXXXXXXX>&WTAccountType=SHACCOUNT&CommBatchEntrustInfo=1", url.host] dataUsingEncoding:NSUTF8StringEncoding];
+	else
+		data = StockTrade(action, dict, showProgress);
 
 	CFHTTPMessageRef response = CFHTTPMessageCreateResponse(kCFAllocatorDefault, 200, NULL, kCFHTTPVersion1_1);
-	CFHTTPMessageSetHeaderFieldValue(response, (CFStringRef)@"Content-Type", (CFStringRef)@"application/text");
+	CFHTTPMessageSetHeaderFieldValue(response, (CFStringRef)@"Content-Type", (CFStringRef)@"text/plain");
 	CFHTTPMessageSetHeaderFieldValue(response, (CFStringRef)@"Connection", (CFStringRef)@"close");
 	CFHTTPMessageSetHeaderFieldValue(response, (CFStringRef)@"Content-Length", (__bridge CFStringRef)[NSString stringWithFormat:@"%d", (int)[data length]]);
 	CFDataRef headerData = CFHTTPMessageCopySerializedMessage(response);

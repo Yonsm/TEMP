@@ -4,7 +4,8 @@
 #import "HTTPServer.h"
 
 //
-tztStockBuySellViewNew *_view = nil;
+tztStockBuySellViewNew *_buyView = nil;
+tztStockBuySellViewNew *_sellView = nil;
 HOOK_MESSAGE(void, tztStockTradeViewController, viewDidAppear_, BOOL animated)
 {
 	_tztStockTradeViewController_viewDidAppear_(self, sel, animated);
@@ -15,8 +16,15 @@ HOOK_MESSAGE(void, tztStockTradeViewController, viewDidAppear_, BOOL animated)
 	{
 		if ([NSStringFromClass(view.class) isEqualToString:@"tztStockBuySellViewNew"])
 		{
-			_view = (id)view;
-			break;
+			long long nMsgType = ((tztStockBuySellViewNew *)view).nMsgType;
+			if (nMsgType == 12310)
+			{
+				_buyView = (tztStockBuySellViewNew *)view;
+			}
+			else if (nMsgType == 12311)
+			{
+				_sellView = (tztStockBuySellViewNew *)view;
+			}
 		}
 	}
 }
@@ -26,11 +34,35 @@ NSData *StockTrade(NSString *action, NSMutableDictionary *dict, BOOL showProgres
 {
 	if (!dict[@"Reqno"])
 	{
+		tztStockBuySellViewNew *view = nil;
+		if ([action isEqualToString:@"110"])
+		{
+			view = [dict[@"Direction"] isEqualToString:@"S"] ? _sellView : _buyView;
+		}
+		id key;
+		int ntztReqNo;
+		long long nMsgType;
+		if (view)
+		{
+			key = view;
+			ntztReqNo = [view ntztReqNo];
+			nMsgType = [view nMsgType];
+		}
+		else
+		{
+			key = dict;	// FAKE!
+			ntztReqNo = 1;
+			nMsgType = 0;
+		}
+
 		Class tztNewReqno = NSClassFromString(@"tztNewReqno");
-		NSString *string = [tztNewReqno key:(long long)_view reqno:[_view ntztReqNo]];
+		NSString *string = [tztNewReqno key:(long long)key reqno:ntztReqNo];
 		id reqno = [tztNewReqno reqnoWithString:string];
-		NSString *data = [NSString stringWithFormat:@"%lld+%@", [_view nMsgType], dict[@"StockCode"]];
-		[reqno setPageData:data];
+		if (nMsgType && dict[@"StockCode"])
+		{
+			NSString *data = [NSString stringWithFormat:@"%lld+%@", nMsgType, dict[@"StockCode"]];
+			[reqno setPageData:data];
+		}
 		NSString *rn = [reqno getReqnoValue];
 		dict[@"Reqno"] = rn;
 	}
@@ -50,24 +82,26 @@ _HOOK_MESSAGE(unsigned long long, tztMoblieStockComm, onSendDataAction_withDictV
 		@synchronized (_actionLogs)
 		{
 			NSString *stamp = NSFormatDateWithStyle(NSDate.date, NSDateFormatterNoStyle, NSDateFormatterMediumStyle);
-			[_actionLogs appendFormat:@"%@ %@-%d=>%@\n", stamp, action, bShowProcess, dict];
+			[_actionLogs appendFormat:@"%@ /%@%@?%@\n", stamp, action, (bShowProcess ? @".1" : @""), NSUrlQueryFromDict(dict)];
 		}
 	}
 	return _tztMoblieStockComm_onSendDataAction_withDictValue_bShowProcess_(self, sel, action, dict, bShowProcess);
 }
 
 //
-NSString * readActionLog(void)
+NSString *ActionLogs(void)
 {
 	if (_actionLogs == nil)
 	{
-		_actionLogs = [NSMutableString string];	// 这里赋值理论上有同步问题，但机率是几乎不会触发，故忽略
 		_Init_tztMoblieStockComm_onSendDataAction_withDictValue_bShowProcess_();
-		return @"Action logging ENABLED...";
+		_actionLogs = [NSMutableString string];
+		return @"Action Logging ENABLED now...";
 	}
-	
+
 	@synchronized (_actionLogs)
 	{
-		return _actionLogs;
+		NSString *logs = _actionLogs;
+		_actionLogs = [NSMutableString string];
+		return logs;
 	}
 }

@@ -1,7 +1,7 @@
 
 // Export
 NSData *StockTrade(NSString *action, NSMutableDictionary *dict, BOOL showProgress);
-NSString *readActionLog(void);
+NSString *ActionLogs(void);
 
 // From class-dump
 @interface tztMoblieStockComm
